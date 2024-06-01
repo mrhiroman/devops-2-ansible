@@ -1,3 +1,4 @@
 # devops-2-ansible
 
-В начале добавить ключ в доверенные на машине, т.к. скрипт идет сразу от рута (тестил на ubuntu там с этим траблы)
+Указать свои хосты и юзеров
+```ansible ansible-playbook.yml -i inventory.ini --ask-pass```
