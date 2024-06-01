@@ -1,59 +1,61 @@
 ---
 - name: Ansible Task
-  hosts: servers
-  become: yes
+  hosts: server
+  become: true
   vars_files:
     - vars.yml
 
   tasks:
-    - name: Create User
-      user:
-        name: "{{ user_name }}"
-        shell: /bin/bash
+    - name: Ensure user is present
+      ansible.builtin.user:
+        name: "{{ username }}"
+        state: present
+        create_home: yes
+
+    - name: Read SSH public key from file
+      ansible.builtin.set_fact:
+        ssh_key: "{{ lookup('file', ssh_key_file) }}"
+
+    - name: Set up authorized keys for the user
+      ansible.builtin.authorized_key:
+        user: "{{ username }}"
+        key: "{{ ssh_key }}"
         state: present
 
-    - name: Mkdir ssh
-      file:
-        path: "/home/{{ user_name }}/.ssh"
+    - name: Ensure the SSH directory exists
+      ansible.builtin.file:
+        path: "/home/{{ username }}/.ssh"
         state: directory
-        owner: "{{ user_name }}"
-        group: "{{ user_name }}"
+        owner: "{{ username }}"
+        group: "{{ username }}"
         mode: '0700'
 
-    - name: Generate keys
-      openssh_keypair:
-        path: "/home/{{ user_name }}/.ssh/id_rsa"
-        type: rsa
-        owner: "{{ user_name }}"
-        group: "{{ user_name }}"
+    - name: Copy SSH public key to the authorized_keys file
+      ansible.builtin.copy:
+        content: "{{ ssh_key }}"
+        dest: "/home/{{ username }}/.ssh/authorized_keys"
+        owner: "{{ username }}"
+        group: "{{ username }}"
         mode: '0600'
-      register: ssh_key
 
-    - name: Create authorized_keys
-      copy:
-        content: "{{ ssh_key.public_key }}"
-        dest: "/home/{{ user_name }}/.ssh/authorized_keys"
-        owner: "{{ user_name }}"
-        group: "{{ user_name }}"
-        mode: '0644'
-
-    - name: Disable password auth
-      lineinfile:
+    - name: Disable password authentication
+      ansible.builtin.lineinfile:
         path: /etc/ssh/sshd_config
         regexp: '^#?PasswordAuthentication'
         line: 'PasswordAuthentication no'
         state: present
         backup: yes
 
-    - name: Restart sshd
-      service:
+    - name: Reload SSH service to apply changes
+      ansible.builtin.service:
         name: sshd
-        state: restarted
+        state: reloaded
 
-    - name: mkdir in /opt/
-      file:
-        path: "/opt/{{ user_name }}"
+    - name: Create a directory in /opt/ with appropriate permissions
+      ansible.builtin.file:
+        path: /opt/{{ username }}
         state: directory
-        owner: "{{ user_name }}"
-        group: "{{ user_name }}"
+        owner: "{{ username }}"
+        group: "{{ username }}"
         mode: '0755'
+
